@@ -28,6 +28,7 @@ public class Main {
 
     private static final Scanner teclado = new Scanner(System.in);
     private static final CityLink gestor = new CityLink();
+    private static final double KM_REFERENCIA = 10;
 
     public static void main(String[] args) {
         try {
@@ -171,12 +172,17 @@ public class Main {
         System.out.println(encontrado);
     }
 
-    private static void listarPedidos() {
+        private static void listarPedidos() {
         String[] lineas = gestor.listarPedidos();
         if (lineas.length == 0) {
             System.out.println("No hay pedidos cargados.");
         }
         for (String linea : lineas) {
+            System.out.println(linea);
+        }
+        System.out.println();
+        System.out.println("Tiempo estimado de cada vehículo para " + KM_REFERENCIA + " km:");
+        for (String linea : gestor.listarTiemposDeEntrega(KM_REFERENCIA)) {
             System.out.println(linea);
         }
     }

@@ -426,6 +426,44 @@ public class CityLink {
         return Arrays.copyOf(repartidores, cantRepartidores);
     }
 
+    /**
+     * Arma un arreglo con el vehículo de cada repartidor. Mezcla bicicletas,
+     * motos y camionetas en un mismo arreglo de tipo Vehiculo.
+     *
+     * @return un arreglo de vehículos, uno por repartidor
+     */
+    public Vehiculo[] getVehiculos() {
+        Vehiculo[] vehiculos = new Vehiculo[cantRepartidores];
+        for (int i = 0; i < cantRepartidores; i++) {
+            vehiculos[i] = repartidores[i].getVehiculo();
+        }
+        return vehiculos;
+    }
+
+    /**
+     * Calcula el tiempo estimado de entrega de cada vehículo para una misma
+     * distancia. Recorre un arreglo de Vehiculo y llama a calcularTiempoEntrega
+     * sin preguntar de qué tipo es cada uno (polimorfismo).
+     *
+     * @param km distancia en km (mayor que cero)
+     * @return una línea de texto por vehículo
+     * @throws IllegalArgumentException si la distancia no es positiva
+     */
+    public String[] listarTiemposDeEntrega(double km) {
+        if (km <= 0) {
+            throw new IllegalArgumentException("La distancia debe ser mayor que cero.");
+        }
+        Vehiculo[] vehiculos = getVehiculos();
+        String[] lineas = new String[vehiculos.length];
+        for (int i = 0; i < vehiculos.length; i++) {
+            Vehiculo v = vehiculos[i];
+            lineas[i] = String.format("%s %s: %.1f min para %.1f km",
+                    v.getClass().getSimpleName(), v.getPatente(),
+                    v.calcularTiempoEntrega(km), km);
+        }
+        return lineas;
+    }
+
     public int getCantClientes() {
         return cantClientes;
     }

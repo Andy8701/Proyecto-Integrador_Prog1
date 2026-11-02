@@ -1,10 +1,13 @@
 package modelo;
 
 import java.util.Arrays;
+import java.time.LocalDateTime;
+
 
 import excepciones.AlmacenamientoLlenoException;
 import excepciones.ClienteNoEncontradoException;
 import excepciones.PedidoInvalidoException;
+import excepciones.CapacidadExcedidaException;
 
 /**
  * Gestor del sistema CityLink. Guarda clientes, pedidos y repartidores en
@@ -218,6 +221,192 @@ public class CityLink {
             }
         }
         return -1;
+    }
+
+    // ------------------------------------------------- Búsquedas por código
+
+    /**
+     * Busca un pedido por su código.
+     *
+     * @param codigo código del pedido
+     * @return el pedido encontrado
+     * @throws PedidoInvalidoException si no existe
+     */
+    public Pedido buscarPedido(int codigo) throws PedidoInvalidoException {
+        int i = indicePedido(codigo);
+        if (i == -1) {
+            throw new PedidoInvalidoException("No existe un pedido con el código " + codigo + ".");
+        }
+        return pedidos[i];
+    }
+
+    /**
+     * Busca un repartidor por su legajo.
+     *
+     * @param legajo legajo del repartidor
+     * @return el repartidor encontrado
+     * @throws IllegalArgumentException si no existe
+     */
+    public Repartidor buscarRepartidor(int legajo) {
+        int i = indiceRepartidor(legajo);
+        if (i == -1) {
+            throw new IllegalArgumentException("No existe un repartidor con el legajo " + legajo + ".");
+        }
+        return repartidores[i];
+    }
+
+    // ------------------------------------------------------------- Operaciones
+
+    /**
+     * Asigna un pedido a un repartidor, verificando capacidad y restricciones.
+     *
+     * @param codigoPedido código del pedido
+     * @param legajo       legajo del repartidor
+     * @throws PedidoInvalidoException      si el pedido no existe, no está pendiente o ya está asignado
+     * @throws CapacidadExcedidaException   si el vehículo no puede transportarlo
+     * @throws AlmacenamientoLlenoException si el repartidor tiene el máximo de pedidos
+     */
+    public void asignarPedido(int codigoPedido, int legajo)
+            throws PedidoInvalidoException, CapacidadExcedidaException, AlmacenamientoLlenoException {
+        Pedido pedido = buscarPedido(codigoPedido);
+        Repartidor repartidor = buscarRepartidor(legajo);
+        repartidor.asignarPedido(pedido);
+    }
+
+    /**
+     * Cambia el estado de un pedido. Para pasar a EN_CAMINO el pedido tiene
+     * que estar asignado a un repartidor.
+     *
+     * @param codigo      código del pedido
+     * @param nuevoEstado estado al que se quiere pasar
+     * @throws PedidoInvalidoException si no existe o no está asignado
+     * @throws excepciones.EstadoInvalidoException si la transición no está permitida
+     */
+    public void cambiarEstadoPedido(int codigo, EstadoPedido nuevoEstado)
+            throws PedidoInvalidoException {
+        Pedido pedido = buscarPedido(codigo);
+        if (nuevoEstado == EstadoPedido.EN_CAMINO && pedido.getVehiculo() == null) {
+            throw new PedidoInvalidoException(
+                    "El pedido " + codigo + " no está asignado a ningún repartidor.");
+        }
+        pedido.cambiarEstado(nuevoEstado);
+    }
+
+    /**
+     * Arma una línea por pedido con su costo y tiempo estimado. Recorre los
+     * pedidos y llama a calcularCosto y calcularTiempoEntrega sin preguntar
+     * de qué tipo es cada uno (polimorfismo).
+     *
+     * @return una línea de texto por cada pedido cargado
+     */
+    public String[] listarPedidos() {
+        String[] lineas = new String[cantPedidos];
+        for (int i = 0; i < cantPedidos; i++) {
+            Pedido p = pedidos[i];
+            Vehiculo v = p.getVehiculo();
+            String detalle;
+            if (v == null) {
+                detalle = "sin vehículo asignado";
+            } else {
+                detalle = String.format("costo $%.2f, tiempo %.1f min",
+                        p.calcularCosto(v), v.calcularTiempoEntrega(p.getDistanciaKm()));
+            }
+            lineas[i] = p + " -> " + detalle;
+        }
+        return lineas;
+    }
+
+    /**
+     * Consulta el estado actual de un pedido (interfaz Rastreable).
+     *
+     * @throws PedidoInvalidoException si no existe
+     */
+    public String consultarEstadoPedido(int codigo) throws PedidoInvalidoException {
+        Rastreable r = buscarPedido(codigo);
+        return r.obtenerEstadoActual();
+    }
+
+    /**
+     * Consulta el estado actual de un repartidor (interfaz Rastreable).
+     *
+     * @throws IllegalArgumentException si no existe
+     */
+    public String consultarEstadoRepartidor(int legajo) {
+        Rastreable r = buscarRepartidor(legajo);
+        return r.obtenerEstadoActual();
+    }
+
+    /**
+     * Suma el importe de todos los pedidos (interfaz Facturable). Los pedidos
+     * sin vehículo o cancelados aportan 0.
+     *
+     * @return el importe total en pesos
+     */
+    public double calcularImporteTotal() {
+        double total = 0;
+        for (int i = 0; i < cantPedidos; i++) {
+            total += pedidos[i].calcularImporte();
+        }
+        return total;
+    }
+
+    // -------------------------------------------------------- Datos de prueba
+
+    /**
+     * Carga 5 clientes, 3 repartidores (uno por tipo de vehículo) y 8 pedidos
+     * de los tres tipos, algunos asignados y en distintos estados.
+     */
+    public void cargarDatosDePrueba()
+            throws PedidoInvalidoException, AlmacenamientoLlenoException,
+                   ClienteNoEncontradoException, CapacidadExcedidaException {
+        Cliente ana = new Cliente(1, "Ana Pérez", "2657-111111", "Centro");
+        Cliente luis = new Cliente(2, "Luis Gómez", "2657-222222", "Norte");
+        Cliente marta = new Cliente(3, "Marta Díaz", "2657-333333", "Sur");
+        Cliente carlos = new Cliente(4, "Carlos Ruiz", "2657-444444", "Este");
+        Cliente sofia = new Cliente(5, "Sofía López", "2657-555555", "Oeste");
+        registrarCliente(ana);
+        registrarCliente(luis);
+        registrarCliente(marta);
+        registrarCliente(carlos);
+        registrarCliente(sofia);
+
+        registrarRepartidor(new Repartidor(101, "Juan Torres", new Bicicleta("BICI-01")));
+        registrarRepartidor(new Repartidor(102, "Lucía Ferreyra", new Moto("AB123CD")));
+        registrarRepartidor(new Repartidor(103, "Pedro Suárez", new Camioneta("AC456EF")));
+
+        registrarPedido(new PedidoNormal(1, ana, "Barrio Norte", 2, 3,
+                LocalDateTime.of(2026, 10, 22, 8, 0)));
+        registrarPedido(new PedidoNormal(2, luis, "Zona Sur", 8, 4.5,
+                LocalDateTime.of(2026, 10, 22, 8, 30)));
+        registrarPedido(new PedidoNormal(3, marta, "Microcentro", 25, 6,
+                LocalDateTime.of(2026, 10, 22, 9, 0)));
+        registrarPedido(new PedidoUrgente(4, carlos, "Parque La Pedrera", 3, 5,
+                LocalDateTime.of(2026, 10, 22, 9, 30)));
+        registrarPedido(new PedidoUrgente(5, sofia, "Terminal", 12, 8,
+                LocalDateTime.of(2026, 10, 22, 10, 0)));
+        registrarPedido(new PedidoFragil(6, ana, "Hospital", 4, 3.5,
+                LocalDateTime.of(2026, 10, 22, 10, 30)));
+        registrarPedido(new PedidoFragil(7, luis, "Universidad", 20, 7,
+                LocalDateTime.of(2026, 10, 22, 11, 0)));
+        registrarPedido(new PedidoFragil(8, marta, "Zona Industrial", 150, 12,
+                LocalDateTime.of(2026, 10, 22, 11, 30)));
+
+        // El pedido 5 queda pendiente y sin asignar.
+        asignarPedido(1, 101);
+        asignarPedido(2, 101);
+        asignarPedido(3, 102);
+        asignarPedido(4, 102);
+        asignarPedido(6, 102);
+        asignarPedido(7, 103);
+        asignarPedido(8, 103);
+
+        cambiarEstadoPedido(1, EstadoPedido.EN_CAMINO);
+        cambiarEstadoPedido(1, EstadoPedido.ENTREGADO);
+        cambiarEstadoPedido(4, EstadoPedido.EN_CAMINO);
+        cambiarEstadoPedido(4, EstadoPedido.ENTREGADO);
+        cambiarEstadoPedido(8, EstadoPedido.EN_CAMINO);
+        cambiarEstadoPedido(8, EstadoPedido.ENTREGADO);
+        cambiarEstadoPedido(3, EstadoPedido.EN_CAMINO);
     }
 
     // ------------------------------------------------------------------ Consulta
